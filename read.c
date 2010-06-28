@@ -9,6 +9,96 @@
 #include <sys/stat.h>
 #include <assert.h>
 
+char *parse_img(char *dest, char *src, int *destsize, int *destit, int *srcit)
+{
+	char *newdest;
+	
+	const char *beg = &src[*srcit]+4;
+	const char *mid = strchr(beg+1, ' ');
+	const char *end = strchr(mid, ']');
+	
+	assert(beg && mid && end);
+	
+	const int imgsize = mid - beg - 1;
+	const int descsize = end - mid - 1;
+	
+	char *image = malloc(imgsize + 1);								
+	char *desc = malloc(descsize + 1);
+	char *buf;
+	
+	image[imgsize] = '\0';
+	desc[descsize] = '\0';
+	
+	strncpy(image, beg+1, imgsize);
+	strncpy(desc, mid+1, descsize);
+	
+	const char format[] = { "<div class=\"imagebox\"><img class=\"image\" src=\"images/%s\" alt=\"%s\" /><br />%s</div>" };
+	
+	int bufsize = strlen(format) - 6 + strlen(image) + 2*strlen(desc) + 1; // - 3*2 because of 3*"%s"
+	buf = malloc(bufsize + 1);
+	
+	snprintf(buf, bufsize, format, image, desc, desc);
+	newdest = realloc(dest, *destsize += bufsize + 1);
+	assert(newdest != NULL);
+	
+	strncpy(newdest + *destit, buf, bufsize);
+	
+	(*srcit) += end - &src[*srcit];
+	(*destit) += strlen(buf);
+	
+	free(desc);
+	free(image);
+	free(buf);
+	
+	return newdest;
+}
+
+char *parse_link(char* dest, char *src, int *destsize, int *destit, int *srcit)
+{
+	char *newdest;
+	
+	const char *beg = &src[*srcit] + 5; // "[link ..." => "link " => 5
+	const char *mid = strchr(beg, '|');
+	const char *end = strchr(mid, ']');
+	
+	while(*mid == ' ') mid++;
+
+	assert(beg && mid && end);
+	
+	const int addrsize = mid - beg;
+	const int namesize = end - mid - 1;
+	
+	char *addr = malloc(addrsize + 1);
+	char *name = malloc(namesize + 1);
+	
+	addr[addrsize] = '\0';
+	name[namesize] = '\0';
+	
+	strncpy(addr, beg, addrsize);
+	strncpy(name, mid + 1, namesize);
+	
+	const char format[] = { "<a href=\"%s\">%s</a>" };
+	const int bufsize = strlen(format) - 2*strlen("%s") + strlen(name) + strlen(addr) + 1;
+	
+	char *buf = malloc(bufsize);
+	
+	sprintf(buf, format, addr, name);
+	
+	newdest = realloc(dest, (*destsize) += strlen(buf) + 1);
+	assert(newdest != NULL);
+	
+	strncpy(&newdest[*destit], buf, strlen(buf));
+	
+	*srcit += end - &src[*srcit];
+	*destit += strlen(buf);
+	
+	free(addr);
+	free(name);
+	free(buf);
+	
+	return newdest;
+}
+
 void parse_article(struct article *article)
 {
 	int i;
@@ -21,42 +111,13 @@ void parse_article(struct article *article)
 	
 	for(i = 0; i < strlen(article->text); i++) {
 		char ch = article->text[i];
-		if(ch == '[' && strncmp(&article->text[i]+1, "img", 3) == 0) {
-			const char *beg = &article->text[i]+4;
-			const char *mid = strchr(beg+1, ' ');
-			const char *end = strchr(mid, ']');
-			
-			const int imgsize = mid - beg - 1;
-			const int descsize = end - mid - 1;
-			
-			char *image = malloc(imgsize + 1);								
-			char *desc = malloc(descsize + 1);
-			char *buf;
-			
-			image[imgsize] = '\0';
-			desc[descsize] = '\0';
-			
-			strncpy(image, beg+1, imgsize);
-			strncpy(desc, mid+1, descsize);
-			
-			const char format[] = { "<div class=\"imagebox\"><img class=\"image\" src=\"images/%s\" alt=\"%s\" /><br />%s</div>" };
-			
-			int bufsize = strlen(format) - 6 + strlen(image) + 2*strlen(desc); // - 3*2 because of 3*"%s"
-			buf = malloc(bufsize + 1);
-			
-			snprintf(buf, bufsize + 1, format, image, desc, desc);
-			
-			dest = realloc(dest, destsize += strlen(buf) + 1);
-			assert(dest != NULL);
-			
-			strcat(dest, buf);
-			
-			i += end - &article->text[i];
-			i2 += strlen(buf);
-			
-			free(desc);
-			free(image);
-			free(buf);
+		if(ch == '[') {
+			if(strncmp(&article->text[i]+1, "img ", 4) == 0)
+				dest = parse_img(dest, article->text, &destsize, &i2, &i);
+			else if(strncmp(&article->text[i]+1, "link ", 5) == 0)
+				dest = parse_link(dest, article->text, &destsize, &i2, &i);
+			else
+				dest[i2++] = '[';
 		} else if(ch == '\n') {
 			const char src[] = { "<br />" };
 			dest = realloc(dest, destsize += sizeof(src));
