@@ -1,3 +1,23 @@
+/*
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor,
+Boston, MA  02110-1301, USA.
+
+---
+Copyright (C) 2010, Lukas Weber <laochailan@web.de>
+*/
+
 #include "blog.h"
 
 #include <stdio.h>
@@ -8,8 +28,7 @@
 
 #include "read.h"
 
-void print_header()
-{
+void print_header() {
 	printf(	"Content-type: text/html\n\n");
 	puts(	"<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd\">");
 	puts(	"<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"en\" xml:lang=\"en\">");
@@ -23,8 +42,7 @@ void print_header()
 	printf(	"\t\t\t<div id=\"banner\"><img src=\"banner.png\" alt=\"%s\" /></div>\n", NAME);
 }
 
-void print_article(struct article *art)
-{	
+void print_article(struct article *art) {	
 	puts(	"\t\t\t<div class=\"article\">");	
 	printf(	"\t\t\t\t<div class=\"date\">%s</div>\n", ctime(&art->ctime));	
 	printf(	"\t\t\t\t<div class=\"title\">%s</div>\n", art->title);
@@ -33,8 +51,7 @@ void print_article(struct article *art)
 	puts(	"\t\t\t</div>");
 }
 
-void print_footer()
-{
+void print_footer() {
 	puts("\t\t<br />");
 	puts("\t\t<div class=\"footer\">Allgemein vernünftig sowohl in <a href=\"http://validator.w3.org/check?uri=referer\">XHTML</a> als auch in <a href=\"http://jigsaw.w3.org/css-validator/check/referer\">CSS</a> || von laochailan || viral lizensiert unter <a rel=\"license\" href=\"http://creativecommons.org/licenses/by-nc-sa/3.0/\">CC-BY-NC-SA</a></div>");
 	
@@ -43,8 +60,7 @@ void print_footer()
 	puts("</html>");
 }
 
-int main(int argc, char **args)
-{
+int main(int argc, char **args) {
 	struct article **articles = read_articles();
 	
 // 	while(FCGI_Accept() >= 0) { // FCGI

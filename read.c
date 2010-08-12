@@ -1,3 +1,23 @@
+/*
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor,
+Boston, MA  02110-1301, USA.
+
+---
+Copyright (C) 2010, Lukas Weber <laochailan@web.de>
+*/
+
 #include "read.h"
 
 #include <string.h>
@@ -9,18 +29,23 @@
 #include <sys/stat.h>
 #include <assert.h>
 
-char *parse_img(char *dest, char *src, int *destsize, int *destit, int *srcit)
-{
+void parse_img(char **dest, char *src, int *destsize, int *destit, int *srcit) {
 	char *newdest;
 	
-	const char *beg = &src[*srcit]+4;
-	const char *mid = strchr(beg+1, ' ');
+	const char *beg = &src[*srcit];
+	
+	while(*beg != ' ') beg++; // jump over the "[img"
+	while(*beg == ' ') beg++;
+	
+	const char *mid = strchr(beg, ' ');
 	const char *end = strchr(mid, ']');
 	
 	assert(beg && mid && end);
+		
+	while(*mid == ' ') mid++;
 	
-	const int imgsize = mid - beg - 1;
-	const int descsize = end - mid - 1;
+	const int imgsize = mid - beg;
+	const int descsize = end - mid;
 	
 	char *image = malloc(imgsize + 1);								
 	char *desc = malloc(descsize + 1);
@@ -29,8 +54,8 @@ char *parse_img(char *dest, char *src, int *destsize, int *destit, int *srcit)
 	image[imgsize] = '\0';
 	desc[descsize] = '\0';
 	
-	strncpy(image, beg+1, imgsize);
-	strncpy(desc, mid+1, descsize);
+	strncpy(image, beg, imgsize);
+	strncpy(desc, mid, descsize);
 	
 	const char format[] = { "<div class=\"imagebox\"><img class=\"image\" src=\"images/%s\" alt=\"%s\" /><br />%s</div>" };
 	
@@ -38,7 +63,7 @@ char *parse_img(char *dest, char *src, int *destsize, int *destit, int *srcit)
 	buf = malloc(bufsize + 1);
 	
 	snprintf(buf, bufsize, format, image, desc, desc);
-	newdest = realloc(dest, *destsize += bufsize + 1);
+	newdest = realloc(*dest, *destsize += bufsize + 1);
 	assert(newdest != NULL);
 	
 	strncpy(newdest + *destit, buf, bufsize);
@@ -50,17 +75,18 @@ char *parse_img(char *dest, char *src, int *destsize, int *destit, int *srcit)
 	free(image);
 	free(buf);
 	
-	return newdest;
+	*dest = newdest;
 }
 
-char *parse_link(char* dest, char *src, int *destsize, int *destit, int *srcit)
-{
+void parse_link(char** dest, char *src, int *destsize, int *destit, int *srcit) {
 	char *newdest;
 	
-	const char *beg = &src[*srcit] + 5; // "[link ..." => "link " => 5
+	const char *beg = &src[*srcit]; 
 	const char *mid = strchr(beg, '|');
 	const char *end = strchr(mid, ']');
 	
+	while(*beg != ' ') beg++; // jump over the "[link"
+	while(*beg == ' ') beg++;
 	while(*mid == ' ') mid++;
 
 	assert(beg && mid && end);
@@ -84,7 +110,7 @@ char *parse_link(char* dest, char *src, int *destsize, int *destit, int *srcit)
 	
 	sprintf(buf, format, addr, name);
 	
-	newdest = realloc(dest, (*destsize) += strlen(buf) + 1);
+	newdest = realloc(*dest, (*destsize) += strlen(buf) + 1);
 	assert(newdest != NULL);
 	
 	strncpy(&newdest[*destit], buf, strlen(buf));
@@ -96,27 +122,26 @@ char *parse_link(char* dest, char *src, int *destsize, int *destit, int *srcit)
 	free(name);
 	free(buf);
 	
-	return newdest;
+	*dest = newdest;
 }
 
-void parse_article(struct article *article)
-{
+void parse_article(struct article *article) {
 	int i;
 	int i2 = 0;
 	
 	int destsize = strlen(article->text) + 1;
 	char *dest = malloc(destsize);
 	
-	strcpy(dest, "");
+	dest[0] = '\0';
 	
 	for(i = 0; i < strlen(article->text); i++) {
 		char ch = article->text[i];
 		if(ch == '[') {
 			if(strncmp(&article->text[i]+1, "img ", 4) == 0)
-				dest = parse_img(dest, article->text, &destsize, &i2, &i);
-			else if(strncmp(&article->text[i]+1, "link ", 5) == 0)
-				dest = parse_link(dest, article->text, &destsize, &i2, &i);
-			else
+				parse_img(&dest, article->text, &destsize, &i2, &i);
+			else if(strncmp(&article->text[i]+1, "link ", 5) == 0) {
+				parse_link(&dest, article->text, &destsize, &i2, &i);
+			} else
 				dest[i2++] = '[';
 		} else if(ch == '\n') {
 			const char src[] = { "<br />" };
@@ -141,8 +166,7 @@ int compare_ctime(const struct article **a1, const struct article **a2) {
 		return 0;
 }
 
-struct article **read_dir(DIR *dir)
-{
+struct article **read_dir(DIR *dir) {
 	struct article **temp = NULL;
 	
 	int size = 0;
@@ -167,7 +191,7 @@ struct article **read_dir(DIR *dir)
 		temp[i]->ctime = stats[i].st_ctime;
 	}
 		
-	qsort(temp, size, sizeof(struct article *), compare_ctime);
+	qsort(temp, size, sizeof(struct article *), (__compar_fn_t) compare_ctime);
 	
 	free(stats);
 	
@@ -177,8 +201,7 @@ struct article **read_dir(DIR *dir)
 	return temp;
 }
 
-void read_content(struct article *article)
-{
+void read_content(struct article *article) {
 	FILE *file;
 	
 	if((file = fopen(article->path, "r")) == NULL)
@@ -189,7 +212,7 @@ void read_content(struct article *article)
 	article->title[strlen(article->title)-1] = '\0'; // remove '\n'
 	
 	int i = 0, ch;
-	int reserved = 1024;
+	int reserved = BUFSIZE;
 	article->text = malloc(reserved);
 	while((ch = fgetc(file)) != EOF) {
 		if(i >= reserved)
@@ -203,8 +226,7 @@ void read_content(struct article *article)
 	fclose(file);
 }
 
-struct article **read_articles()
-{	
+struct article **read_articles() {	
 	DIR *articledir = opendir(ARTICLEDIR);
 	if(articledir == NULL)
 		err(EXIT_FAILURE, "Entrydir could not be opened");

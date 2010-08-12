@@ -14,6 +14,9 @@ blog: $(OBJ)
 install: blog
 	cp $(BIN) $(INSTALLPATH)
 
+doc: Doxyfile
+	doxygen
+
 .PHONY: clean
 clean:
 	rm $(BIN) $(OBJ)
